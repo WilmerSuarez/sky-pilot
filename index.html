@@ -172,9 +172,10 @@ canvas#sky{position:fixed;top:0;left:0;width:100%;height:55%;z-index:1}
         </div>
       </div>
     </div>
-    <!-- CENTER: Yoke + Mini gauges -->
+    <!-- CENTER: Yoke + Tilt button + Mini gauges -->
     <div class="center-col">
       <canvas id="yoke" width="360" height="200"></canvas>
+      <button id="bTilt" style="background:linear-gradient(180deg,#3a5a27,#1a3a10);border:2px solid #6a4;border-radius:8px;color:#8f8;font-family:inherit;font-size:9px;font-weight:bold;padding:4px 14px;cursor:pointer;-webkit-tap-highlight-color:transparent;text-shadow:0 0 6px rgba(0,255,0,.4)">📐 ENABLE TILT</button>
       <div class="mini-gauges">
         <div class="mini-gauge"><div class="g-needle" id="nFuel"></div><div class="g-dot"></div><div class="g-val" id="vFuel">78</div><div class="g-label">FUEL %</div></div>
         <div class="mini-gauge"><div class="g-needle" id="nTemp"></div><div class="g-dot"></div><div class="g-val" id="vTemp">420</div><div class="g-label">ENG TEMP</div></div>
@@ -285,27 +286,27 @@ function resize(){
 resize();
 window.addEventListener('resize',resize);
 
-// ── Dense cloud data: 3 layers, ~150 total ──
+// ── Dense cloud data: 3 layers, 200 total ──
 const clouds=[];
 
 function mkCloud(layer){
   const cfg={
-    far: {xr:8000, zr:8000, yMin:250, yH:500, pMin:5, pMax:9, rMin:30, rMax:55, dxR:90, dyR:14, drift:[.15,.35]},
-    mid: {xr:6000, zr:6000, yMin:400, yH:700, pMin:5, pMax:8, rMin:35, rMax:65, dxR:80, dyR:20, drift:[.4,.7]},
-    near:{xr:4000, zr:4000, yMin:-200, yH:500, pMin:6, pMax:10, rMin:50, rMax:80, dxR:110, dyR:30, drift:[.8,1.5]},
+    far: {xr:8000, zr:8000, yMin:200, yH:600, pMin:8, pMax:14, rMin:50, rMax:90, dxR:140, dyR:20, drift:[.15,.35]},
+    mid: {xr:5000, zr:5000, yMin:300, yH:800, pMin:8, pMax:12, rMin:60, rMax:110, dxR:130, dyR:28, drift:[.4,.7]},
+    near:{xr:3500, zr:3500, yMin:-300, yH:600, pMin:10, pMax:16, rMin:70, rMax:130, dxR:160, dyR:35, drift:[.8,1.5]},
   }[layer];
   return{
     x:(Math.random()-.5)*cfg.xr, z:(Math.random()-.5)*cfg.zr,
     y:cfg.yMin+Math.random()*cfg.yH, layer,
     puffs:cfg.pMin+Math.floor(Math.random()*(cfg.pMax-cfg.pMin+1)),
-    offsets:Array.from({length:10},()=>({dx:(Math.random()-.5)*cfg.dxR,dy:(Math.random()-.5)*cfg.dyR,r:cfg.rMin+Math.random()*(cfg.rMax-cfg.rMin)})),
+    offsets:Array.from({length:16},()=>({dx:(Math.random()-.5)*cfg.dxR,dy:(Math.random()-.5)*cfg.dyR,r:cfg.rMin+Math.random()*(cfg.rMax-cfg.rMin)})),
     drift:cfg.drift[0]+Math.random()*(cfg.drift[1]-cfg.drift[0]),
-    tint:Math.random()  // 0=pure white, 1=slight grey
+    tint:Math.random()
   };
 }
-for(let i=0;i<50;i++)clouds.push(mkCloud('far'));
-for(let i=0;i<50;i++)clouds.push(mkCloud('mid'));
-for(let i=0;i<50;i++)clouds.push(mkCloud('near'));
+for(let i=0;i<70;i++)clouds.push(mkCloud('far'));
+for(let i=0;i<70;i++)clouds.push(mkCloud('mid'));
+for(let i=0;i<60;i++)clouds.push(mkCloud('near'));
 
 // ── Stars for space mode (pre-generated) ──
 const stars=[];
@@ -452,16 +453,12 @@ function drawScene(now){
       ctx.fillRect(0,Math.max(0,horizon),W,H-Math.max(0,horizon));
     }
 
-    // ── Clouds (150 total, dense) ──
-    const cloudColor=isNight?'#334466':'#ffffff';
-    const cloudShadow=isNight?'#1a2244':'#bbccdd';
-    const wrapDist={far:4000,mid:3000,near:2000};
+    // ── Clouds (200 total, dense & large) ──
+    const wrapDist={far:4000,mid:2500,near:1750};
 
     clouds.forEach(cl=>{
-      // Drift with throttle speed
       cl.x+=cl.drift*spdFactor*1.2;
 
-      // Wrap around player
       const wd=wrapDist[cl.layer];
       let dx=cl.x-ST.px, dz=cl.z-ST.pz;
       if(dx>wd)cl.x-=wd*2; if(dx<-wd)cl.x+=wd*2;
@@ -476,30 +473,36 @@ function drawScene(now){
       const sx=W/2+(side+ST.roll*fwd*0.3)*scale;
       const sy=horizon-(cl.y-ST.alt+Math.sin(now*.0003+cl.x*.01)*15)*scale*.3;
 
-      if(sx<-400||sx>W+400||sy<-200||sy>H+150)return;
+      if(sx<-500||sx>W+500||sy<-300||sy>H+200)return;
 
       const dist01=Math.min(1,fwd/3500);
-      const baseAlpha=(1-dist01*.6)*(cl.layer==='near'?.65:.8);
-
-      // Tint variation: slightly bluish/grey
-      const tintMix=cl.tint*0.15;
+      const baseAlpha=(1-dist01*.5)*(cl.layer==='near'?.6:.8);
 
       for(let p=0;p<cl.puffs;p++){
         const o=cl.offsets[p];
-        const pr=Math.max(2,o.r*scale*.28);
-        const px=sx+o.dx*scale*.22;
-        const py=sy+o.dy*scale*.22;
+        const pr=Math.max(3,o.r*scale*.35);
+        const px=sx+o.dx*scale*.25;
+        const py=sy+o.dy*scale*.25;
 
-        ctx.globalAlpha=baseAlpha*0.5;
-        ctx.fillStyle=cloudShadow;
+        // Dark underside shadow
+        ctx.globalAlpha=baseAlpha*0.35;
+        ctx.fillStyle=isNight?'#0a1228':'#99aabb';
         ctx.beginPath();
-        ctx.ellipse(px,py+pr*0.18,pr*1.05,pr*0.55,0,0,Math.PI*2);
+        ctx.ellipse(px,py+pr*0.22,pr*1.1,pr*0.5,0,0,Math.PI*2);
         ctx.fill();
 
-        ctx.globalAlpha=baseAlpha;
-        ctx.fillStyle=cloudColor;
+        // Main cloud body
+        ctx.globalAlpha=baseAlpha*0.9;
+        ctx.fillStyle=isNight?'#334466':'#eef4ff';
         ctx.beginPath();
         ctx.ellipse(px,py,pr,pr*0.55,0,0,Math.PI*2);
+        ctx.fill();
+
+        // Bright highlight on top
+        ctx.globalAlpha=baseAlpha*0.5;
+        ctx.fillStyle=isNight?'#445577':'#ffffff';
+        ctx.beginPath();
+        ctx.ellipse(px-pr*0.1,py-pr*0.12,pr*0.7,pr*0.35,0,0,Math.PI*2);
         ctx.fill();
       }
     });
@@ -606,31 +609,45 @@ function drawYoke(){
 // ═══════════════════════════════════════════════════════════
 let hasGyro=false;
 let gBeta=0,gGamma=0;
-let gyroAttempted=false;
+let gyroListening=false;
 
-function setupGyro(){
-  if(gyroAttempted)return;
-  gyroAttempted=true;
+function listenGyro(){
+  if(gyroListening)return;
+  gyroListening=true;
+  window.addEventListener('deviceorientation',onOri);
+  window.addEventListener('deviceorientationabsolute',onOri);
+}
 
-  function listen(){
-    window.addEventListener('deviceorientation',onOri);
-    // Also try with different event name for some browsers
-    window.addEventListener('deviceorientationabsolute',onOri);
+// Called from user gesture (tap on ENABLE TILT button)
+function requestGyro(){
+  // Try requestPermission (required on all iOS browsers since they all use WebKit)
+  if(typeof DeviceOrientationEvent!=='undefined' && typeof DeviceOrientationEvent.requestPermission==='function'){
+    DeviceOrientationEvent.requestPermission().then(p=>{
+      if(p==='granted'){listenGyro()}
+      updTiltBtn();
+    }).catch(()=>{listenGyro();updTiltBtn()});
+  }else{
+    // Android / desktop — just listen
+    listenGyro();
   }
+  // Also try DeviceMotion permission (some iOS versions need this too)
+  if(typeof DeviceMotionEvent!=='undefined' && typeof DeviceMotionEvent.requestPermission==='function'){
+    DeviceMotionEvent.requestPermission().catch(()=>{});
+  }
+  setTimeout(updTiltBtn,1500);
+}
 
-  if(typeof DeviceOrientationEvent!=='undefined'){
-    if(typeof DeviceOrientationEvent.requestPermission==='function'){
-      // Safari iOS 13+ — needs user gesture + HTTPS
-      DeviceOrientationEvent.requestPermission().then(p=>{
-        if(p==='granted'){listen();hasGyro=true}
-      }).catch(()=>{});
-    }else{
-      // Firefox/Chrome/Android — just listen
-      listen();
-      setTimeout(()=>{
-        if(!hasGyro)console.log('No gyro events received. Gyro requires HTTPS on iOS.');
-      },3000);
-    }
+function updTiltBtn(){
+  const btn=document.getElementById('bTilt');
+  if(!btn)return;
+  if(hasGyro){
+    btn.textContent='✅ TILT ON';
+    btn.style.borderColor='#0f0';
+    btn.style.color='#0f0';
+  }else{
+    btn.textContent='❌ NO TILT (use touch)';
+    btn.style.borderColor='#f44';
+    btn.style.color='#f88';
   }
 }
 
@@ -640,6 +657,7 @@ function onOri(e){
   hasGyro=true;
   gBeta=b||0;
   gGamma=g||0;
+  updTiltBtn();
 }
 
 // Touch/mouse drag on sky canvas for steering
@@ -785,6 +803,9 @@ function setupButtons(){
   tap('bSmk',()=>{ST.smoke=!ST.smoke;document.getElementById('lSmk').classList.toggle('on',ST.smoke);sndClick()});
   tap('bHorn',()=>{sndHorn()});
 
+  // Tilt enable button (needs user gesture on iOS)
+  tap('bTilt',()=>{requestGyro();sndClick()});
+
   tap('bFire',()=>{ST.fire=!ST.fire;document.getElementById('lFire').classList.toggle('on',ST.fire);sndBeep()});
   tap('bHeat',()=>{ST.heat=!ST.heat;document.getElementById('lHeat').classList.toggle('on',ST.heat);sndClick()});
   tap('bOxy',()=>{ST.oxy=!ST.oxy;document.getElementById('lOxy').classList.toggle('on',ST.oxy);sndClick()});
@@ -840,13 +861,13 @@ setupButtons();
 setupThrottle();
 setupTouch();
 
-// Start gyro immediately (Firefox doesn't need user gesture)
-setupGyro();
+// Try listening for gyro immediately (works on Android/desktop)
+listenGyro();
 
-// Also try on first touch (Safari needs user gesture + HTTPS)
+// First touch: init audio + try gyro permission
 document.addEventListener('touchstart',function f(){
   initAudio();
-  setupGyro();
+  requestGyro();
   document.removeEventListener('touchstart',f);
 },{once:true});
 
