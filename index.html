@@ -853,12 +853,25 @@ setupTouch();
 listenGyro();
 
 // Try to lock landscape orientation
-try{if(screen.orientation&&screen.orientation.lock)screen.orientation.lock('landscape').catch(()=>{})}catch(e){}
+function lockLandscape(){
+  try{
+    const el=document.documentElement;
+    const goFS=el.requestFullscreen||el.webkitRequestFullscreen;
+    if(goFS){
+      goFS.call(el).then(()=>{
+        if(screen.orientation&&screen.orientation.lock)screen.orientation.lock('landscape').catch(()=>{});
+      }).catch(()=>{});
+    }
+    if(screen.orientation&&screen.orientation.lock)screen.orientation.lock('landscape').catch(()=>{});
+  }catch(e){}
+}
+lockLandscape();
 
-// First touch: init audio + try gyro permission
+// First touch: init audio + try gyro permission + lock landscape
 document.addEventListener('touchstart',function f(){
   initAudio();
   requestGyro();
+  lockLandscape();
   // Re-calibrate on first touch so neutral = current holding position
   refBeta=null; refGamma=null;
   document.removeEventListener('touchstart',f);
