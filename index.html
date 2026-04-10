@@ -683,7 +683,7 @@ function setupTouch(){
 function updControls(dt){
   if(hasGyro&&refBeta!==null){
     ST.tRoll=Math.max(-1,Math.min(1,(gGamma-refGamma)*0.04));
-    ST.tPitch=Math.max(-1,Math.min(1,-(gBeta-refBeta)*0.02));
+    ST.tPitch=Math.max(-1,Math.min(1,(gBeta-refBeta)*0.02));
   }else if(dragActive){
     const dx=dragCurX-dragStartX;
     const dy=dragCurY-dragStartY;
