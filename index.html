@@ -353,8 +353,8 @@ function drawScene(now){
     // Stars — shift with heading, twinkle, move with speed
     for(let i=0;i<stars.length;i++){
       const s=stars[i];
-      const sx=((s.x*W+ST.hdg*200*s.bri+now*0.02*spdFactor*s.bri)%W+W)%W;
-      const sy=((s.y*H*0.95+ST.pitch*50*s.bri)%H+H)%H;
+      const sx=((s.x*W+ST.hdg*500*s.bri+now*0.02*spdFactor*s.bri)%W+W)%W;
+      const sy=((s.y*H*0.95+ST.pitch*200*s.bri)%H+H)%H;
       const twinkle=Math.sin(now*.001*s.spd+s.phase)*.4+.6;
       ctx.globalAlpha=s.bri*twinkle;
       ctx.fillStyle='#fff';
@@ -365,8 +365,8 @@ function drawScene(now){
     ctx.globalAlpha=1;
 
     // Moon — upper right
-    const moonX=W*0.78+ST.roll*40;
-    const moonY=H*0.18+ST.pitch*60;
+    const moonX=W*0.78+ST.roll*120;
+    const moonY=H*0.18+ST.pitch*200;
     const moonR=Math.min(W,H)*0.1;
 
     // Glow
