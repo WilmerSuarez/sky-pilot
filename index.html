@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Sky Pilot">
+<title>Sky Pilot</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#000;
+  font-family:'Courier New',monospace;
+  -webkit-user-select:none;user-select:none;
+  -webkit-touch-callout:none;touch-action:none}
+canvas#sky{position:fixed;top:0;left:0;width:100%;height:55%;z-index:1}
+
+/* ── Cockpit Panel ── */
+#cockpit{
+  position:fixed;bottom:0;left:0;right:0;height:45%;z-index:10;
+  background:linear-gradient(180deg,#2a2a2a 0%,#1e1e1e 30%,#151515 100%);
+  border-top:3px solid #555;
+  display:flex;flex-direction:column;
+  padding:4px 6px 6px;
+  box-shadow:0 -4px 20px rgba(0,0,0,0.6);
+  overflow:hidden;
+}
+
+.top-bar{display:flex;justify-content:space-between;align-items:center;padding:0 4px;margin-bottom:3px;height:22px;flex-shrink:0}
+.spd-disp{color:#0f8;font-size:11px;font-weight:bold;text-shadow:0 0 8px rgba(0,255,100,.5)}
+.tb-right{display:flex;align-items:center;gap:6px}
+.mode-toggles{display:flex;align-items:center;gap:8px}
+
+/* Toggle pill (shared style for day/night and sky/space) */
+.tog{display:flex;align-items:center;gap:3px}
+.tog-lbl{color:#888;font-size:7px;font-weight:bold}
+.tog-btn{background:linear-gradient(180deg,#444,#222);border:2px solid #666;border-radius:10px;width:40px;height:20px;cursor:pointer;position:relative;transition:all .3s;-webkit-tap-highlight-color:transparent}
+.tog-knob{position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;transition:all .3s}
+
+/* Day/Night knob colors */
+#dnBtn .tog-knob{background:linear-gradient(180deg,#fc0,#f80);box-shadow:0 0 4px rgba(255,200,0,.5)}
+#dnBtn.on{border-color:#46a;background:linear-gradient(180deg,#223,#112)}
+#dnBtn.on .tog-knob{left:22px;background:linear-gradient(180deg,#abd,#68b);box-shadow:0 0 4px rgba(100,150,255,.5)}
+
+/* Sky/Space knob colors */
+#spBtn .tog-knob{background:linear-gradient(180deg,#8cf,#4af);box-shadow:0 0 4px rgba(100,200,255,.5)}
+#spBtn.on{border-color:#63c;background:linear-gradient(180deg,#112,#001)}
+#spBtn.on .tog-knob{left:22px;background:linear-gradient(180deg,#c8f,#a4d);box-shadow:0 0 6px rgba(200,100,255,.6)}
+
+.fs-btn{background:linear-gradient(180deg,#444,#222);border:2px solid #666;border-radius:4px;color:#aaa;font-size:14px;width:24px;height:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent}
+.fs-btn:active{background:#555}
+
+/* Status LEDs bar */
+.status-bar{display:flex;justify-content:center;gap:5px;padding:1px 0;margin-bottom:2px;flex-shrink:0}
+.sled{width:6px;height:6px;border-radius:50%;background:#222}
+.sled.on{box-shadow:0 0 5px 2px currentColor}
+
+/* Main cockpit layout: 3 columns */
+.cockpit-main{flex:1;display:flex;gap:4px;min-height:0;overflow:hidden}
+
+/* Left column: throttle + gauges */
+.left-col{display:flex;flex-direction:column;align-items:center;gap:4px;width:200px;flex-shrink:0}
+.left-top{display:flex;gap:4px;align-items:center}
+.thr-area{display:flex;flex-direction:column;align-items:center;gap:2px}
+.thr-lbl{color:#aaa;font-size:8px;font-weight:bold}
+.thr-track{width:24px;height:90px;background:linear-gradient(180deg,#0a0a0a,#333);border-radius:5px;border:2px solid #555;position:relative}
+.thr-handle{position:absolute;left:-3px;right:-3px;height:22px;background:linear-gradient(180deg,#ff4444,#cc0000);border-radius:3px;border:2px solid #ff6666;bottom:20%;box-shadow:0 2px 6px rgba(255,0,0,0.3)}
+.thr-marks{position:absolute;right:-12px;top:0;bottom:0;display:flex;flex-direction:column;justify-content:space-between;font-size:6px;color:#666}
+.gauges-grid{display:flex;flex-wrap:wrap;gap:3px;justify-content:center}
+.gauge{width:72px;height:72px;background:radial-gradient(circle,#1a1a1a 60%,#0a0a0a);border-radius:50%;border:2px solid #555;position:relative;box-shadow:inset 0 2px 6px rgba(0,0,0,0.8)}
+.g-label{position:absolute;bottom:8px;left:0;right:0;text-align:center;color:#aaa;font-size:6px;font-weight:bold}
+.g-val{position:absolute;bottom:16px;left:0;right:0;text-align:center;color:#fff;font-size:9px;font-weight:bold}
+.g-needle{position:absolute;bottom:50%;left:50%;width:2px;height:26px;background:linear-gradient(0deg,#ff3300,#ff6644);transform-origin:bottom center;transform:translateX(-50%) rotate(0deg);border-radius:1px;box-shadow:0 0 3px rgba(255,50,0,0.5)}
+.g-dot{position:absolute;top:50%;left:50%;width:6px;height:6px;background:#666;border-radius:50%;transform:translate(-50%,-50%);border:1px solid #888}
+.hz-ball{position:absolute;inset:5px;border-radius:50%;overflow:hidden}
+.hz-sky{position:absolute;left:-50%;width:200%;height:200%;top:-50%;background:linear-gradient(180deg,#4488ff 0%,#4488ff 48%,#88cc44 48%,#88cc44 52%,#886633 52%,#886633 100%);transform-origin:center center}
+.hz-w{position:absolute;top:50%;height:2px;background:#ff8800;transform:translateY(-50%)}
+.hz-w.l{left:6px;width:15px}.hz-w.r{right:6px;width:15px}
+.hz-dot{position:absolute;top:50%;left:50%;width:4px;height:4px;background:#ff8800;border-radius:50%;transform:translate(-50%,-50%)}
+.cmp-rose{position:absolute;inset:8px;border-radius:50%;background:conic-gradient(from 0deg,#333 0deg,#222 90deg,#333 180deg,#222 270deg,#333 360deg)}
+.cmp-ptr{position:absolute;top:2px;left:50%;width:0;height:0;border-left:4px solid transparent;border-right:4px solid transparent;border-top:6px solid #ff4444;transform:translateX(-50%)}
+
+/* Center column: yoke + mini gauges */
+.center-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:0}
+#yoke{width:180px;height:100px;flex-shrink:0}
+.mini-gauges{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}
+.mini-gauge{width:52px;height:52px;background:radial-gradient(circle,#1a1a1a 60%,#0a0a0a);border-radius:50%;border:2px solid #444;position:relative;box-shadow:inset 0 1px 4px rgba(0,0,0,0.8)}
+.mini-gauge .g-needle{height:18px}
+.mini-gauge .g-label{font-size:5px;bottom:6px}
+.mini-gauge .g-val{font-size:7px;bottom:13px}
+.mini-gauge .g-dot{width:4px;height:4px}
+
+/* Right column: buttons + switches */
+.right-col{display:flex;flex-direction:column;gap:2px;width:260px;flex-shrink:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
+.btn-grid{display:flex;flex-wrap:wrap;gap:2px;justify-content:center}
+.cb{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2px 3px;width:60px;height:34px;border-radius:6px;border:2px solid;cursor:pointer;font-family:inherit;font-size:7px;font-weight:bold;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,0.8);box-shadow:0 2px 4px rgba(0,0,0,0.4),inset 0 1px 1px rgba(255,255,255,0.1);text-transform:uppercase;letter-spacing:.3px;-webkit-tap-highlight-color:transparent;flex-shrink:0}
+.cb:active{transform:scale(.93) translateY(1px);box-shadow:none}
+.bled{width:6px;height:6px;border-radius:50%;margin-bottom:1px;background:#333;border:1px solid #555;transition:all .2s}
+.bled.on{box-shadow:0 0 6px 2px currentColor}
+.bled.grn.on{background:#0f0;color:#0f0}.bled.red.on{background:red;color:red}
+.bled.amb.on{background:#fa0;color:#fa0}.bled.blu.on{background:#0af;color:#0af}
+.bled.wht.on{background:#fff;color:#fff}.bled.mag.on{background:#f4f;color:#f4f}
+.bled.cyn.on{background:#0ff;color:#0ff}.bled.org.on{background:#f80;color:#f80}
+.bled.pnk.on{background:#f88;color:#f88}.bled.lim.on{background:#8f0;color:#8f0}
+.bg{background:linear-gradient(180deg,#2d5a27,#1a3a15);border-color:#4a8a40}
+.bl{background:linear-gradient(180deg,#5a5a27,#3a3a15);border-color:#8a8a40}
+.ba{background:linear-gradient(180deg,#27355a,#151a3a);border-color:#4060aa}
+.br{background:linear-gradient(180deg,#5a2755,#3a153a);border-color:#8a4080}
+.bs{background:linear-gradient(180deg,#5a4027,#3a2a15);border-color:#8a6a40}
+.bk{background:linear-gradient(180deg,#27505a,#15353a);border-color:#408a8a}
+.bh{background:linear-gradient(180deg,#8a2020,#5a1010);border-color:#cc4444}
+.bx{background:linear-gradient(180deg,#3a3a5a,#1a1a3a);border-color:#6060aa}
+.by{background:linear-gradient(180deg,#5a3a27,#3a2215);border-color:#8a5a40}
+.bz{background:linear-gradient(180deg,#275a3a,#15402a);border-color:#40aa6a}
+
+/* Switches */
+.sw-row{display:flex;gap:5px;justify-content:center;flex-shrink:0;padding-top:2px}
+.sw{display:flex;flex-direction:column;align-items:center;gap:1px}
+.sw-l{color:#888;font-size:6px;font-weight:bold;text-transform:uppercase}
+.sw-body{width:20px;height:30px;background:linear-gradient(180deg,#444,#222);border-radius:3px;border:2px solid #555;position:relative;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.sw-lev{position:absolute;left:2px;right:2px;height:12px;border-radius:2px;background:linear-gradient(180deg,#888,#666);border:1px solid #999;transition:all .15s;top:2px}
+.sw-body.on .sw-lev{top:auto;bottom:2px;background:linear-gradient(180deg,#aaa,#888)}
+.sw-body.on{border-color:#8f8}
+
+/* Wipers */
+.wiper{position:fixed;z-index:5;width:3px;height:26vh;background:linear-gradient(90deg,#333,#666,#333);transform-origin:bottom center;bottom:45%;left:30%;pointer-events:none;display:none;border-radius:2px}
+.wiper.rt{left:auto;right:30%}
+.wiper.on{display:block;animation:wipe 2s infinite ease-in-out}
+.wiper.rt.on{animation:wipeR 2s infinite ease-in-out}
+@keyframes wipe{0%,100%{transform:rotate(-40deg)}50%{transform:rotate(40deg)}}
+@keyframes wipeR{0%,100%{transform:rotate(40deg)}50%{transform:rotate(-40deg)}}
+</style>
+</head>
+<body>
+<canvas id="sky"></canvas>
+<div class="wiper" id="wL"></div><div class="wiper rt" id="wR"></div>
+<div id="cockpit">
+  <!-- Top bar: speed + mode toggles + fullscreen -->
+  <div class="top-bar">
+    <div class="spd-disp"><span id="spd">250</span> KTS | ALT <span id="alt">12,000</span> FT</div>
+    <div class="tb-right">
+      <div class="mode-toggles">
+        <div class="tog"><span class="tog-lbl">DAY</span><div class="tog-btn" id="dnBtn"><div class="tog-knob"></div></div><span class="tog-lbl">NITE</span></div>
+        <div class="tog"><span class="tog-lbl">SKY</span><div class="tog-btn" id="spBtn"><div class="tog-knob"></div></div><span class="tog-lbl">SPACE</span></div>
+      </div>
+      <div class="fs-btn" id="fsBtn">⛶</div>
+    </div>
+  </div>
+  <!-- Status LEDs -->
+  <div class="status-bar" id="sbar"></div>
+  <!-- Main 3-column layout -->
+  <div class="cockpit-main">
+    <!-- LEFT: Throttle + Gauges -->
+    <div class="left-col">
+      <div class="left-top">
+        <div class="thr-area">
+          <div class="thr-lbl">THR</div>
+          <div class="thr-track" id="thrTrack">
+            <div class="thr-handle" id="thrHandle"></div>
+            <div class="thr-marks"><span>MAX</span><span>·</span><span>·</span><span>IDLE</span></div>
+          </div>
+        </div>
+        <div class="gauges-grid">
+          <div class="gauge" id="gHz">
+            <div class="hz-ball"><div class="hz-sky" id="hzSky"></div></div>
+            <div class="hz-w l"></div><div class="hz-w r"></div><div class="hz-dot"></div>
+            <div class="g-label">ATTITUDE</div>
+          </div>
+          <div class="gauge"><div class="g-needle" id="nAlt"></div><div class="g-dot"></div><div class="g-val" id="vAlt">12.0</div><div class="g-label">ALT x1000</div></div>
+          <div class="gauge"><div class="g-needle" id="nSpd"></div><div class="g-dot"></div><div class="g-val" id="vSpd">250</div><div class="g-label">AIRSPEED</div></div>
+          <div class="gauge"><div class="cmp-rose" id="cmpRose"></div><div class="cmp-ptr"></div><div class="g-val" id="vHdg" style="bottom:10px;color:#6f6">360°</div><div class="g-label">HEADING</div></div>
+        </div>
+      </div>
+    </div>
+    <!-- CENTER: Yoke + Mini gauges -->
+    <div class="center-col">
+      <canvas id="yoke" width="360" height="200"></canvas>
+      <div class="mini-gauges">
+        <div class="mini-gauge"><div class="g-needle" id="nFuel"></div><div class="g-dot"></div><div class="g-val" id="vFuel">78</div><div class="g-label">FUEL %</div></div>
+        <div class="mini-gauge"><div class="g-needle" id="nTemp"></div><div class="g-dot"></div><div class="g-val" id="vTemp">420</div><div class="g-label">ENG TEMP</div></div>
+        <div class="mini-gauge"><div class="g-needle" id="nRPM"></div><div class="g-dot"></div><div class="g-val" id="vRPM">2.4</div><div class="g-label">RPM x1000</div></div>
+        <div class="mini-gauge"><div class="g-needle" id="nVSI"></div><div class="g-dot"></div><div class="g-val" id="vVSI">0</div><div class="g-label">V/S FPM</div></div>
+      </div>
+    </div>
+    <!-- RIGHT: Buttons + Switches -->
+    <div class="right-col">
+      <div class="btn-grid">
+        <button class="cb bg" id="bGear"><div class="bled grn" id="lGear"></div>⚙️ GEAR</button>
+        <button class="cb bl" id="bLit"><div class="bled amb" id="lLit"></div>💡 LIGHTS</button>
+        <button class="cb ba" id="bAP"><div class="bled blu" id="lAP"></div>🤖 AUTO</button>
+        <button class="cb br" id="bRad"><div class="bled mag" id="lRad"></div>📻 RADIO</button>
+        <button class="cb bs" id="bBelt"><div class="bled amb" id="lBelt"></div>🔔 BELT</button>
+        <button class="cb bk" id="bSmk"><div class="bled wht" id="lSmk"></div>🌈 SMOKE</button>
+        <button class="cb bh" id="bHorn">📢 HORN</button>
+        <button class="cb bx" id="bFire"><div class="bled red" id="lFire"></div>🚒 FIRE</button>
+        <button class="cb by" id="bHeat"><div class="bled org" id="lHeat"></div>🌡️ HEAT</button>
+        <button class="cb bz" id="bOxy"><div class="bled cyn" id="lOxy"></div>💨 O2</button>
+        <button class="cb bx" id="bNav"><div class="bled lim" id="lNav"></div>🧭 NAV</button>
+        <button class="cb by" id="bWarn"><div class="bled red" id="lWarn"></div>⚠️ WARN</button>
+      </div>
+      <div class="sw-row">
+        <div class="sw"><span class="sw-l">ENG 1</span><div class="sw-body on" id="sE1"><div class="sw-lev"></div></div></div>
+        <div class="sw"><span class="sw-l">ENG 2</span><div class="sw-body on" id="sE2"><div class="sw-lev"></div></div></div>
+        <div class="sw"><span class="sw-l">WIPERS</span><div class="sw-body" id="sWip"><div class="sw-lev"></div></div></div>
+        <div class="sw"><span class="sw-l">CABIN</span><div class="sw-body on" id="sCab"><div class="sw-lev"></div></div></div>
+        <div class="sw"><span class="sw-l">APU</span><div class="sw-body on" id="sApu"><div class="sw-lev"></div></div></div>
+        <div class="sw"><span class="sw-l">XPDR</span><div class="sw-body on" id="sXpdr"><div class="sw-lev"></div></div></div>
+        <div class="sw"><span class="sw-l">PITOT</span><div class="sw-body on" id="sPitot"><div class="sw-lev"></div></div></div>
+        <div class="sw"><span class="sw-l">STROBE</span><div class="sw-body" id="sStrobe"><div class="sw-lev"></div></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════
+const ST={
+  thr:.5, hdg:0, pitch:0, roll:0, alt:1200, spd:250,
+  night:false, gear:false, lights:false, ap:false,
+  radio:false, belt:false, smoke:false, space:false,
+  eng1:true, eng2:true, wipers:false, cabin:true,
+  px:0, pz:0, tRoll:0, tPitch:0, bob:0,
+  fire:false, heat:false, oxy:false, nav:false, warn:false,
+  apu:true, xpdr:true, pitot:true, strobe:false,
+};
+
+// ═══════════════════════════════════════════════════════════
+// AUDIO
+// ═══════════════════════════════════════════════════════════
+let AC=null,MG,e1o,e1g,e2o,e2g,wN,wG,rO,rG,rL,rI=null;
+
+function initAudio(){
+  if(AC)return;
+  try{
+    AC=new(window.AudioContext||window.webkitAudioContext)();
+    MG=AC.createGain();MG.gain.value=.5;MG.connect(AC.destination);
+    e1o=AC.createOscillator();e1o.type='sawtooth';e1o.frequency.value=80;
+    e1g=AC.createGain();e1g.gain.value=.06;
+    const f1=AC.createBiquadFilter();f1.type='lowpass';f1.frequency.value=300;
+    e1o.connect(f1);f1.connect(e1g);e1g.connect(MG);e1o.start();
+    e2o=AC.createOscillator();e2o.type='sawtooth';e2o.frequency.value=83;
+    e2g=AC.createGain();e2g.gain.value=.06;
+    const f2=AC.createBiquadFilter();f2.type='lowpass';f2.frequency.value=300;
+    e2o.connect(f2);f2.connect(e2g);e2g.connect(MG);e2o.start();
+    const bl=AC.sampleRate*2,buf=AC.createBuffer(1,bl,AC.sampleRate),d=buf.getChannelData(0);
+    for(let i=0;i<bl;i++)d[i]=Math.random()*2-1;
+    wN=AC.createBufferSource();wN.buffer=buf;wN.loop=true;
+    wG=AC.createGain();wG.gain.value=.02;
+    const wf=AC.createBiquadFilter();wf.type='bandpass';wf.frequency.value=800;wf.Q.value=.5;
+    wN.connect(wf);wf.connect(wG);wG.connect(MG);wN.start();
+  }catch(e){console.log('Audio init error',e)}
+}
+
+function updAudio(){
+  if(!AC)return;const t=AC.currentTime,f=60+ST.thr*80;
+  e1o.frequency.setTargetAtTime(f,t,.1);e2o.frequency.setTargetAtTime(f*1.04,t,.1);
+  e1g.gain.setTargetAtTime(ST.eng1?.05+ST.thr*.06:0,t,.1);
+  e2g.gain.setTargetAtTime(ST.eng2?.05+ST.thr*.06:0,t,.1);
+  wG.gain.setTargetAtTime(.01+ST.thr*.04,t,.1);
+}
+
+function sndClick(){if(!AC)return;const o=AC.createOscillator(),g=AC.createGain();o.frequency.value=800+Math.random()*400;o.type='square';g.gain.value=.15;g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+.08);o.connect(g);g.connect(MG);o.start();o.stop(AC.currentTime+.08)}
+function sndSwitch(){if(!AC)return;const o=AC.createOscillator(),g=AC.createGain();o.frequency.value=2000+Math.random()*1000;o.type='triangle';g.gain.value=.12;g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+.05);o.connect(g);g.connect(MG);o.start();o.stop(AC.currentTime+.05)}
+function sndDing(){if(!AC)return;const o=AC.createOscillator(),g=AC.createGain();o.frequency.value=1200;o.type='sine';g.gain.value=.2;g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+.8);o.connect(g);g.connect(MG);o.start();o.stop(AC.currentTime+.8)}
+function sndClunk(){if(!AC)return;const o=AC.createOscillator(),g=AC.createGain();o.frequency.value=120;o.type='square';g.gain.value=.2;g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+.3);o.connect(g);g.connect(MG);o.start();o.stop(AC.currentTime+.3);const o2=AC.createOscillator(),g2=AC.createGain();o2.frequency.value=80;o2.type='sine';g2.gain.value=.15;g2.gain.exponentialRampToValueAtTime(.001,AC.currentTime+.4);o2.connect(g2);g2.connect(MG);o2.start(AC.currentTime+.05);o2.stop(AC.currentTime+.4)}
+function sndHorn(){if(!AC)return;[280,350,440].forEach((f,i)=>{const o=AC.createOscillator(),g=AC.createGain();o.frequency.value=f;o.type='sawtooth';g.gain.value=.1;g.gain.setTargetAtTime(.001,AC.currentTime+.6,.1);const fl=AC.createBiquadFilter();fl.type='lowpass';fl.frequency.value=600;o.connect(fl);fl.connect(g);g.connect(MG);o.start(AC.currentTime+i*.05);o.stop(AC.currentTime+.8)})}
+function sndBeep(){if(!AC)return;const o=AC.createOscillator(),g=AC.createGain();o.frequency.value=600;o.type='sine';g.gain.value=.1;g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+.15);o.connect(g);g.connect(MG);o.start();o.stop(AC.currentTime+.15)}
+function sndWhoosh(){if(!AC)return;const o=AC.createOscillator(),g=AC.createGain();o.type='sine';o.frequency.value=300;o.frequency.exponentialRampToValueAtTime(1200,AC.currentTime+.4);g.gain.value=.15;g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+.6);const fl=AC.createBiquadFilter();fl.type='bandpass';fl.frequency.value=600;fl.Q.value=1;o.connect(fl);fl.connect(g);g.connect(MG);o.start();o.stop(AC.currentTime+.6)}
+function togRadio(on){if(!AC)return;if(on){if(rI)return;rO=AC.createOscillator();rG=AC.createGain();rL=AC.createOscillator();const lg=AC.createGain();rO.type='sawtooth';rO.frequency.value=200;rG.gain.value=.04;rL.frequency.value=5;lg.gain.value=100;rL.connect(lg);lg.connect(rO.frequency);const fl=AC.createBiquadFilter();fl.type='bandpass';fl.frequency.value=1500;fl.Q.value=2;rO.connect(fl);fl.connect(rG);rG.connect(MG);rO.start();rL.start();rI=setInterval(()=>{if(rO&&AC){rO.frequency.setTargetAtTime(150+Math.random()*200,AC.currentTime,.05);rL.frequency.setTargetAtTime(3+Math.random()*8,AC.currentTime,.05)}},200)}else{if(rI){clearInterval(rI);rI=null}try{rO?.stop()}catch(e){}try{rL?.stop()}catch(e){}rO=rG=rL=null}}
+
+// ═══════════════════════════════════════════════════════════
+// CANVAS SKY RENDERER
+// ═══════════════════════════════════════════════════════════
+const cv=document.getElementById('sky');
+const ctx=cv.getContext('2d');
+let W,H;
+
+function resize(){
+  const dpr=Math.min(window.devicePixelRatio,2);
+  W=cv.width=cv.clientWidth*dpr;
+  H=cv.height=cv.clientHeight*dpr;
+}
+resize();
+window.addEventListener('resize',resize);
+
+// ── Dense cloud data: 3 layers, ~150 total ──
+const clouds=[];
+
+function mkCloud(layer){
+  const cfg={
+    far: {xr:8000, zr:8000, yMin:250, yH:500, pMin:5, pMax:9, rMin:30, rMax:55, dxR:90, dyR:14, drift:[.15,.35]},
+    mid: {xr:6000, zr:6000, yMin:400, yH:700, pMin:5, pMax:8, rMin:35, rMax:65, dxR:80, dyR:20, drift:[.4,.7]},
+    near:{xr:4000, zr:4000, yMin:-200, yH:500, pMin:6, pMax:10, rMin:50, rMax:80, dxR:110, dyR:30, drift:[.8,1.5]},
+  }[layer];
+  return{
+    x:(Math.random()-.5)*cfg.xr, z:(Math.random()-.5)*cfg.zr,
+    y:cfg.yMin+Math.random()*cfg.yH, layer,
+    puffs:cfg.pMin+Math.floor(Math.random()*(cfg.pMax-cfg.pMin+1)),
+    offsets:Array.from({length:10},()=>({dx:(Math.random()-.5)*cfg.dxR,dy:(Math.random()-.5)*cfg.dyR,r:cfg.rMin+Math.random()*(cfg.rMax-cfg.rMin)})),
+    drift:cfg.drift[0]+Math.random()*(cfg.drift[1]-cfg.drift[0]),
+    tint:Math.random()  // 0=pure white, 1=slight grey
+  };
+}
+for(let i=0;i<50;i++)clouds.push(mkCloud('far'));
+for(let i=0;i<50;i++)clouds.push(mkCloud('mid'));
+for(let i=0;i<50;i++)clouds.push(mkCloud('near'));
+
+// ── Stars for space mode (pre-generated) ──
+const stars=[];
+for(let i=0;i<400;i++){
+  stars.push({x:Math.random(),y:Math.random(),r:.5+Math.random()*2.5,bri:.2+Math.random()*.8,spd:.3+Math.random()*3,phase:Math.random()*6.28});
+}
+
+// ── Moon craters ──
+const craters=[
+  {cx:.3,cy:.35,r:.08},{cx:.55,cy:.25,r:.12},{cx:.4,cy:.6,r:.1},
+  {cx:.65,cy:.55,r:.07},{cx:.25,cy:.7,r:.06},{cx:.7,cy:.35,r:.05},
+  {cx:.5,cy:.45,r:.09},{cx:.35,cy:.2,r:.04},{cx:.6,cy:.7,r:.06}
+];
+
+const smokeP=[];
+
+function drawScene(now){
+  const isSpace=ST.space;
+  const isNight=ST.night;
+  // Speed factor: 0.5 at idle, 2.0 at max throttle
+  const spdFactor=0.5+ST.thr*1.5;
+
+  // ── Sky gradient ──
+  let skyTop,skyBot;
+  if(isSpace){skyTop='#000008';skyBot='#050520'}
+  else if(isNight){skyTop='#05051a';skyBot='#0a1535'}
+  else{skyTop='#2288ee';skyBot='#aaddff'}
+
+  const skyGrad=ctx.createLinearGradient(0,0,0,H);
+  skyGrad.addColorStop(0,skyTop);
+  skyGrad.addColorStop(1,skyBot);
+  ctx.fillStyle=skyGrad;
+  ctx.fillRect(0,0,W,H);
+
+  const fov=W*0.8;
+  const horizon=H*0.45+ST.pitch*300;
+  const sinH=Math.sin(ST.hdg),cosH=Math.cos(ST.hdg);
+
+  if(isSpace){
+    // ── SPACE MODE ──
+
+    // Stars — shift with heading, twinkle, move with speed
+    for(let i=0;i<stars.length;i++){
+      const s=stars[i];
+      const sx=((s.x*W+ST.hdg*200*s.bri+now*0.005*spdFactor*s.bri)%W+W)%W;
+      const sy=((s.y*H*0.95+ST.pitch*50*s.bri)%H+H)%H;
+      const twinkle=Math.sin(now*.001*s.spd+s.phase)*.4+.6;
+      ctx.globalAlpha=s.bri*twinkle;
+      ctx.fillStyle='#fff';
+      ctx.beginPath();
+      ctx.arc(sx,sy,s.r,0,Math.PI*2);
+      ctx.fill();
+    }
+    ctx.globalAlpha=1;
+
+    // Moon — upper right
+    const moonX=W*0.78+ST.roll*40;
+    const moonY=H*0.18+ST.pitch*60;
+    const moonR=Math.min(W,H)*0.1;
+
+    // Glow
+    const moonGlow=ctx.createRadialGradient(moonX,moonY,moonR*0.8,moonX,moonY,moonR*2.5);
+    moonGlow.addColorStop(0,'rgba(200,210,255,0.15)');
+    moonGlow.addColorStop(1,'rgba(200,210,255,0)');
+    ctx.fillStyle=moonGlow;
+    ctx.beginPath();
+    ctx.arc(moonX,moonY,moonR*2.5,0,Math.PI*2);
+    ctx.fill();
+
+    // Body
+    const mGrad=ctx.createRadialGradient(moonX-moonR*0.2,moonY-moonR*0.2,0,moonX,moonY,moonR);
+    mGrad.addColorStop(0,'#eeeef8');
+    mGrad.addColorStop(.7,'#ccccdd');
+    mGrad.addColorStop(1,'#aaaabb');
+    ctx.fillStyle=mGrad;
+    ctx.beginPath();
+    ctx.arc(moonX,moonY,moonR,0,Math.PI*2);
+    ctx.fill();
+
+    // Craters
+    ctx.fillStyle='rgba(100,100,120,0.3)';
+    craters.forEach(c=>{
+      ctx.beginPath();
+      ctx.arc(moonX+(c.cx-.5)*moonR*1.6,moonY+(c.cy-.5)*moonR*1.6,c.r*moonR,0,Math.PI*2);
+      ctx.fill();
+    });
+
+    // Earth glow at bottom
+    const earthGrad=ctx.createRadialGradient(W*0.5,H*1.8,0,W*0.5,H*1.8,H*1.2);
+    earthGrad.addColorStop(0,'rgba(40,120,255,0.25)');
+    earthGrad.addColorStop(.3,'rgba(30,100,200,0.15)');
+    earthGrad.addColorStop(.5,'rgba(20,60,150,0.08)');
+    earthGrad.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=earthGrad;
+    ctx.fillRect(0,H*0.5,W,H*0.5);
+
+    // Atmosphere line
+    ctx.strokeStyle='rgba(100,180,255,0.3)';
+    ctx.lineWidth=2;
+    ctx.beginPath();
+    ctx.arc(W*0.5,H*1.8,H*1.15,Math.PI*1.15,Math.PI*1.85);
+    ctx.stroke();
+
+  } else {
+    // ── SKY MODE (clouds) ──
+
+    // Night stars
+    if(isNight){
+      ctx.fillStyle='#fff';
+      for(let i=0;i<120;i++){
+        const sx=((i*137.5+ST.hdg*100)%W+W)%W;
+        const sy=(i*97.3+i*i*0.7)%(H*0.4);
+        ctx.globalAlpha=(Math.sin(now*.001+i)*.3+.5)*.6;
+        ctx.fillRect(sx,sy,1.5,1.5);
+      }
+      ctx.globalAlpha=1;
+    }
+
+    // Horizon glow
+    const glowGrad=ctx.createLinearGradient(0,horizon-H*0.08,0,horizon+H*0.08);
+    if(isNight){
+      glowGrad.addColorStop(0,'rgba(10,20,50,0)');
+      glowGrad.addColorStop(.5,'rgba(30,40,80,0.3)');
+      glowGrad.addColorStop(1,'rgba(5,10,30,0)');
+    }else{
+      glowGrad.addColorStop(0,'rgba(255,240,200,0)');
+      glowGrad.addColorStop(.5,'rgba(255,240,200,0.25)');
+      glowGrad.addColorStop(1,'rgba(200,220,255,0)');
+    }
+    ctx.fillStyle=glowGrad;
+    ctx.fillRect(0,horizon-H*0.08,W,H*0.16);
+
+    // Below-horizon haze
+    if(horizon<H){
+      const hazeGrad=ctx.createLinearGradient(0,horizon,0,H);
+      if(isNight){
+        hazeGrad.addColorStop(0,'rgba(15,20,40,0.3)');
+        hazeGrad.addColorStop(1,'rgba(8,10,25,0.8)');
+      }else{
+        hazeGrad.addColorStop(0,'rgba(200,220,245,0.4)');
+        hazeGrad.addColorStop(1,'rgba(180,200,240,0.7)');
+      }
+      ctx.fillStyle=hazeGrad;
+      ctx.fillRect(0,Math.max(0,horizon),W,H-Math.max(0,horizon));
+    }
+
+    // ── Clouds (150 total, dense) ──
+    const cloudColor=isNight?'#334466':'#ffffff';
+    const cloudShadow=isNight?'#1a2244':'#bbccdd';
+    const wrapDist={far:4000,mid:3000,near:2000};
+
+    clouds.forEach(cl=>{
+      // Drift with throttle speed
+      cl.x+=cl.drift*spdFactor*0.4;
+
+      // Wrap around player
+      const wd=wrapDist[cl.layer];
+      let dx=cl.x-ST.px, dz=cl.z-ST.pz;
+      if(dx>wd)cl.x-=wd*2; if(dx<-wd)cl.x+=wd*2;
+      if(dz>wd)cl.z-=wd*2; if(dz<-wd)cl.z+=wd*2;
+      dx=cl.x-ST.px; dz=cl.z-ST.pz;
+
+      const fwd=dx*sinH-dz*cosH;
+      const side=dx*cosH+dz*sinH;
+      if(fwd<30||fwd>3500)return;
+
+      const scale=fov/fwd;
+      const sx=W/2+(side+ST.roll*fwd*0.3)*scale;
+      const sy=horizon-(cl.y-ST.alt+Math.sin(now*.0003+cl.x*.01)*15)*scale*.3;
+
+      if(sx<-400||sx>W+400||sy<-200||sy>H+150)return;
+
+      const dist01=Math.min(1,fwd/3500);
+      const baseAlpha=(1-dist01*.6)*(cl.layer==='near'?.65:.8);
+
+      // Tint variation: slightly bluish/grey
+      const tintMix=cl.tint*0.15;
+
+      for(let p=0;p<cl.puffs;p++){
+        const o=cl.offsets[p];
+        const pr=Math.max(2,o.r*scale*.28);
+        const px=sx+o.dx*scale*.22;
+        const py=sy+o.dy*scale*.22;
+
+        ctx.globalAlpha=baseAlpha*0.5;
+        ctx.fillStyle=cloudShadow;
+        ctx.beginPath();
+        ctx.ellipse(px,py+pr*0.18,pr*1.05,pr*0.55,0,0,Math.PI*2);
+        ctx.fill();
+
+        ctx.globalAlpha=baseAlpha;
+        ctx.fillStyle=cloudColor;
+        ctx.beginPath();
+        ctx.ellipse(px,py,pr,pr*0.55,0,0,Math.PI*2);
+        ctx.fill();
+      }
+    });
+    ctx.globalAlpha=1;
+  }
+
+  // ── Landing lights (both modes) ──
+  if(ST.lights){
+    const lightColor=isSpace?'rgba(150,180,255,0.1)':'rgba(255,255,200,0.12)';
+    const beamBot=Math.max(horizon+10,H*0.6);
+    const grad=ctx.createRadialGradient(W/2,horizon,0,W/2,beamBot,H*0.3);
+    grad.addColorStop(0,lightColor);
+    grad.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=grad;
+    ctx.beginPath();
+    ctx.moveTo(W/2-20,horizon);
+    ctx.lineTo(W*.15,beamBot);ctx.lineTo(W*.85,beamBot);
+    ctx.lineTo(W/2+20,horizon);
+    ctx.fill();
+  }
+
+  // ── Smoke trail ──
+  if(ST.smoke){
+    const colors=['#ff4444','#ff8844','#ffff44','#44ff44','#4444ff','#ff44ff'];
+    smokeP.push({x:W/2+(Math.random()-.5)*20,y:H*.55,r:4+Math.random()*6,life:1,
+      color:colors[Math.floor(Math.random()*colors.length)],
+      vx:(Math.random()-.5)*2,vy:-1-Math.random()*2});
+  }
+  for(let i=smokeP.length-1;i>=0;i--){
+    const p=smokeP[i];p.life-=.015;p.x+=p.vx;p.y+=p.vy;p.r*=1.01;
+    if(p.life<=0){smokeP.splice(i,1);continue}
+    ctx.globalAlpha=p.life*.6;ctx.fillStyle=p.color;
+    ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();
+  }
+  ctx.globalAlpha=1;
+}
+
+// ═══════════════════════════════════════════════════════════
+// YOKE — drawn on dashboard canvas
+// ═══════════════════════════════════════════════════════════
+const yokeCanvas=document.getElementById('yoke');
+const yCtx=yokeCanvas.getContext('2d');
+
+function drawYoke(){
+  const w=yokeCanvas.width, h=yokeCanvas.height;
+  yCtx.clearRect(0,0,w,h);
+
+  const dpr=w/180;
+  const cx=w/2, cy=h*0.75;
+  const r=w*0.36;
+  const rollAngle=ST.roll*0.6;
+
+  yCtx.save();
+  yCtx.translate(cx,cy);
+  yCtx.rotate(rollAngle);
+
+  // Column
+  yCtx.fillStyle='#444';
+  yCtx.fillRect(-4*dpr,-10*dpr,8*dpr,h*0.5);
+
+  // Wheel rim
+  yCtx.strokeStyle='#666';
+  yCtx.lineWidth=6*dpr;
+  yCtx.beginPath();
+  yCtx.arc(0,0,r,Math.PI*1.15,Math.PI*1.85);
+  yCtx.stroke();
+
+  // Left spoke
+  yCtx.strokeStyle='#555';
+  yCtx.lineWidth=5*dpr;
+  yCtx.beginPath();
+  yCtx.moveTo(-r*0.85,-r*0.15);
+  yCtx.lineTo(-r*0.15,0);
+  yCtx.stroke();
+
+  // Right spoke
+  yCtx.beginPath();
+  yCtx.moveTo(r*0.85,-r*0.15);
+  yCtx.lineTo(r*0.15,0);
+  yCtx.stroke();
+
+  // Center hub
+  yCtx.fillStyle='#555';
+  yCtx.beginPath();
+  yCtx.arc(0,0,r*0.18,0,Math.PI*2);
+  yCtx.fill();
+  yCtx.strokeStyle='#777';
+  yCtx.lineWidth=2*dpr;
+  yCtx.stroke();
+
+  // Grip bumps
+  yCtx.fillStyle='#777';
+  for(let a=Math.PI*1.2;a<Math.PI*1.8;a+=0.15){
+    yCtx.beginPath();
+    yCtx.arc(Math.cos(a)*r,Math.sin(a)*r,3*dpr,0,Math.PI*2);
+    yCtx.fill();
+  }
+
+  yCtx.restore();
+}
+
+// ═══════════════════════════════════════════════════════════
+// CONTROLS — gyro + touch drag fallback
+// ═══════════════════════════════════════════════════════════
+let hasGyro=false;
+let gBeta=0,gGamma=0;
+let gyroAttempted=false;
+
+function setupGyro(){
+  if(gyroAttempted)return;
+  gyroAttempted=true;
+
+  function listen(){
+    window.addEventListener('deviceorientation',onOri);
+    // Also try with different event name for some browsers
+    window.addEventListener('deviceorientationabsolute',onOri);
+  }
+
+  if(typeof DeviceOrientationEvent!=='undefined'){
+    if(typeof DeviceOrientationEvent.requestPermission==='function'){
+      // Safari iOS 13+ — needs user gesture + HTTPS
+      DeviceOrientationEvent.requestPermission().then(p=>{
+        if(p==='granted'){listen();hasGyro=true}
+      }).catch(()=>{});
+    }else{
+      // Firefox/Chrome/Android — just listen
+      listen();
+      setTimeout(()=>{
+        if(!hasGyro)console.log('No gyro events received. Gyro requires HTTPS on iOS.');
+      },3000);
+    }
+  }
+}
+
+function onOri(e){
+  const b=e.beta, g=e.gamma;
+  if(b===null&&g===null)return;
+  hasGyro=true;
+  gBeta=b||0;
+  gGamma=g||0;
+}
+
+// Touch/mouse drag on sky canvas for steering
+let dragActive=false, dragStartX=0, dragStartY=0, dragCurX=0, dragCurY=0;
+
+function setupTouch(){
+  const el=cv;
+  el.addEventListener('pointerdown',e=>{
+    dragActive=true;
+    dragStartX=dragCurX=e.clientX;
+    dragStartY=dragCurY=e.clientY;
+    el.setPointerCapture(e.pointerId);
+  });
+  el.addEventListener('pointermove',e=>{
+    if(!dragActive)return;
+    dragCurX=e.clientX;
+    dragCurY=e.clientY;
+  });
+  el.addEventListener('pointerup',e=>{
+    dragActive=false;
+    ST.tRoll=0;
+    ST.tPitch=0;
+    try{el.releasePointerCapture(e.pointerId)}catch(ex){}
+  });
+  el.addEventListener('pointercancel',()=>{
+    dragActive=false;
+    ST.tRoll=0;
+    ST.tPitch=0;
+  });
+}
+
+function updControls(dt){
+  if(hasGyro){
+    ST.tRoll=Math.max(-1,Math.min(1,-gGamma*.02));
+    ST.tPitch=Math.max(-1,Math.min(1,-(gBeta-40)*.012));
+  }else if(dragActive){
+    const dx=dragCurX-dragStartX;
+    const dy=dragCurY-dragStartY;
+    ST.tRoll=Math.max(-1,Math.min(1,-dx*.005));
+    ST.tPitch=Math.max(-1,Math.min(1,-dy*.005));
+  }
+
+  ST.roll+=(ST.tRoll-ST.roll)*3*dt;
+  ST.pitch+=(ST.tPitch-ST.pitch)*3*dt;
+  ST.roll=Math.max(-1.2,Math.min(1.2,ST.roll));
+  ST.pitch=Math.max(-.8,Math.min(.8,ST.pitch));
+  if(ST.ap){ST.tRoll*=.3;ST.tPitch*=.3}
+  ST.hdg+=ST.roll*.8*dt;
+  ST.spd=100+ST.thr*400;
+  const mv=ST.spd*.5*dt;
+  ST.px+=Math.sin(ST.hdg)*mv;
+  ST.pz-=Math.cos(ST.hdg)*mv;
+  ST.alt+=ST.pitch*200*dt;
+  ST.alt=Math.max(200,Math.min(2500,ST.alt));
+  ST.bob+=dt*1.5;
+}
+
+// ═══════════════════════════════════════════════════════════
+// THROTTLE DRAG
+// ═══════════════════════════════════════════════════════════
+let tDrag=false;
+function setupThrottle(){
+  const tr=document.getElementById('thrTrack'),h=document.getElementById('thrHandle');
+  function upd(cy){const r=tr.getBoundingClientRect(),p=1-Math.max(0,Math.min(1,(cy-r.top)/r.height));ST.thr=p;h.style.bottom=(p*(r.height-22))+'px'}
+  tr.addEventListener('touchstart',e=>{e.preventDefault();tDrag=true;upd(e.touches[0].clientY)},{passive:false});
+  tr.addEventListener('touchmove',e=>{e.preventDefault();if(tDrag)upd(e.touches[0].clientY)},{passive:false});
+  tr.addEventListener('touchend',()=>tDrag=false);
+  tr.addEventListener('pointerdown',e=>{tDrag=true;upd(e.clientY)});
+  window.addEventListener('pointermove',e=>{if(tDrag)upd(e.clientY)});
+  window.addEventListener('pointerup',()=>tDrag=false);
+}
+
+// ═══════════════════════════════════════════════════════════
+// GAUGES
+// ═══════════════════════════════════════════════════════════
+function updGauges(){
+  document.getElementById('hzSky').style.transform=`rotate(${ST.roll*57*3}deg) translateY(${ST.pitch*80}px)`;
+  document.getElementById('nAlt').style.transform=`translateX(-50%) rotate(${(ST.alt/3000)*270-135}deg)`;
+  document.getElementById('vAlt').textContent=(ST.alt/100).toFixed(1);
+  document.getElementById('nSpd').style.transform=`translateX(-50%) rotate(${(ST.spd/500)*270-135}deg)`;
+  document.getElementById('vSpd').textContent=Math.round(ST.spd);
+  const hd=((ST.hdg*57.3)%360+360)%360;
+  document.getElementById('cmpRose').style.transform=`rotate(${-hd}deg)`;
+  document.getElementById('vHdg').textContent=Math.round(hd)+'°';
+  document.getElementById('spd').textContent=Math.round(ST.spd);
+  document.getElementById('alt').textContent=Math.round(ST.alt*10).toLocaleString();
+
+  const fuelPct=78-ST.thr*0.002*(Date.now()%10000)/100;
+  document.getElementById('nFuel').style.transform=`translateX(-50%) rotate(${(fuelPct/100)*270-135}deg)`;
+  document.getElementById('vFuel').textContent=Math.round(fuelPct);
+
+  const temp=350+ST.thr*150+Math.sin(Date.now()*.001)*20;
+  document.getElementById('nTemp').style.transform=`translateX(-50%) rotate(${(temp/800)*270-135}deg)`;
+  document.getElementById('vTemp').textContent=Math.round(temp);
+
+  const rpm=1.5+ST.thr*2+Math.sin(Date.now()*.0015)*.2;
+  document.getElementById('nRPM').style.transform=`translateX(-50%) rotate(${(rpm/4)*270-135}deg)`;
+  document.getElementById('vRPM').textContent=rpm.toFixed(1);
+
+  const vsi=ST.pitch*1500;
+  const vsiNorm=(vsi+2000)/4000;
+  document.getElementById('nVSI').style.transform=`translateX(-50%) rotate(${vsiNorm*270-135}deg)`;
+  document.getElementById('vVSI').textContent=Math.round(vsi);
+}
+
+// ═══════════════════════════════════════════════════════════
+// STATUS LEDS
+// ═══════════════════════════════════════════════════════════
+const sleds=[];
+function initLeds(){
+  const bar=document.getElementById('sbar');
+  const cols=['#f00','#0f0','#fa0','#0af','#f4f','#ff0','#f00','#0f0','#fa0','#0af','#f4f','#ff0','#f60','#0f8','#f0f','#4af','#8f0','#f48','#f00','#0f0','#fa0','#0af','#ff0','#f60','#0af','#f4f','#0f0','#fa0','#f00','#8f0'];
+  cols.forEach(c=>{
+    const d=document.createElement('div');d.className='sled';d.style.color=c;
+    d.dataset.c=c;d.dataset.p=(Math.random()*6.28).toString();d.dataset.s=(.5+Math.random()*3).toString();
+    bar.appendChild(d);sleds.push(d);
+  });
+}
+function updLeds(t){
+  sleds.forEach(d=>{
+    const on=Math.sin(t*parseFloat(d.dataset.s)+parseFloat(d.dataset.p))>.3;
+    d.style.background=on?d.dataset.c:'#222';
+    d.className=on?'sled on':'sled';
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// BUTTON HANDLERS
+// ═══════════════════════════════════════════════════════════
+function tap(id,fn){
+  const el=document.getElementById(id);
+  if(!el)return;
+  el.addEventListener('touchend',e=>{e.preventDefault();initAudio();fn()});
+  el.addEventListener('click',e=>{e.preventDefault();initAudio();fn()});
+}
+
+function setupButtons(){
+  tap('bGear',()=>{ST.gear=!ST.gear;document.getElementById('lGear').classList.toggle('on',ST.gear);sndClunk()});
+  tap('bLit',()=>{ST.lights=!ST.lights;document.getElementById('lLit').classList.toggle('on',ST.lights);sndClick()});
+  tap('bAP',()=>{ST.ap=!ST.ap;document.getElementById('lAP').classList.toggle('on',ST.ap);sndClick()});
+  tap('bRad',()=>{ST.radio=!ST.radio;document.getElementById('lRad').classList.toggle('on',ST.radio);togRadio(ST.radio);sndClick()});
+  tap('bBelt',()=>{ST.belt=!ST.belt;document.getElementById('lBelt').classList.toggle('on',ST.belt);sndDing()});
+  tap('bSmk',()=>{ST.smoke=!ST.smoke;document.getElementById('lSmk').classList.toggle('on',ST.smoke);sndClick()});
+  tap('bHorn',()=>{sndHorn()});
+
+  tap('bFire',()=>{ST.fire=!ST.fire;document.getElementById('lFire').classList.toggle('on',ST.fire);sndBeep()});
+  tap('bHeat',()=>{ST.heat=!ST.heat;document.getElementById('lHeat').classList.toggle('on',ST.heat);sndClick()});
+  tap('bOxy',()=>{ST.oxy=!ST.oxy;document.getElementById('lOxy').classList.toggle('on',ST.oxy);sndClick()});
+  tap('bNav',()=>{ST.nav=!ST.nav;document.getElementById('lNav').classList.toggle('on',ST.nav);sndBeep()});
+  tap('bWarn',()=>{ST.warn=!ST.warn;document.getElementById('lWarn').classList.toggle('on',ST.warn);sndDing()});
+
+  // Mode toggles in top bar
+  tap('dnBtn',()=>{ST.night=!ST.night;document.getElementById('dnBtn').classList.toggle('on',ST.night);sndSwitch()});
+  tap('spBtn',()=>{ST.space=!ST.space;document.getElementById('spBtn').classList.toggle('on',ST.space);sndWhoosh()});
+
+  // Switches
+  tap('sE1',()=>{ST.eng1=!ST.eng1;document.getElementById('sE1').classList.toggle('on',ST.eng1);sndSwitch()});
+  tap('sE2',()=>{ST.eng2=!ST.eng2;document.getElementById('sE2').classList.toggle('on',ST.eng2);sndSwitch()});
+  tap('sWip',()=>{ST.wipers=!ST.wipers;document.getElementById('sWip').classList.toggle('on',ST.wipers);document.getElementById('wL').classList.toggle('on',ST.wipers);document.getElementById('wR').classList.toggle('on',ST.wipers);sndSwitch()});
+  tap('sCab',()=>{ST.cabin=!ST.cabin;document.getElementById('sCab').classList.toggle('on',ST.cabin);document.getElementById('cockpit').style.filter=ST.cabin?'none':'brightness(0.5)';sndSwitch()});
+
+  tap('sApu',()=>{ST.apu=!ST.apu;document.getElementById('sApu').classList.toggle('on',ST.apu);sndSwitch()});
+  tap('sXpdr',()=>{ST.xpdr=!ST.xpdr;document.getElementById('sXpdr').classList.toggle('on',ST.xpdr);sndSwitch()});
+  tap('sPitot',()=>{ST.pitot=!ST.pitot;document.getElementById('sPitot').classList.toggle('on',ST.pitot);sndSwitch()});
+  tap('sStrobe',()=>{ST.strobe=!ST.strobe;document.getElementById('sStrobe').classList.toggle('on',ST.strobe);sndSwitch()});
+
+  // Fullscreen
+  tap('fsBtn',()=>{
+    try{
+      const el=document.documentElement;
+      if(el.requestFullscreen)el.requestFullscreen();
+      else if(el.webkitRequestFullscreen)el.webkitRequestFullscreen();
+    }catch(e){}
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// MAIN LOOP
+// ═══════════════════════════════════════════════════════════
+let lastT=0;
+function loop(t){
+  requestAnimationFrame(loop);
+  const dt=Math.min((t-lastT)/1000,.05);
+  lastT=t;
+  updControls(dt);
+  drawScene(t);
+  drawYoke();
+  updGauges();
+  updLeds(t*.001);
+  updAudio();
+}
+
+// ═══════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════
+initLeds();
+setupButtons();
+setupThrottle();
+setupTouch();
+
+// Start gyro immediately (Firefox doesn't need user gesture)
+setupGyro();
+
+// Also try on first touch (Safari needs user gesture + HTTPS)
+document.addEventListener('touchstart',function f(){
+  initAudio();
+  setupGyro();
+  document.removeEventListener('touchstart',f);
+},{once:true});
+
+// Prevent bounce/zoom
+document.addEventListener('touchmove',e=>{if(!e.target.closest('.thr-track'))e.preventDefault()},{passive:false});
+document.addEventListener('gesturestart',e=>e.preventDefault());
+document.addEventListener('gesturechange',e=>e.preventDefault());
+
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
