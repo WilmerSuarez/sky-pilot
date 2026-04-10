@@ -523,17 +523,32 @@ function drawScene(now){
 
   // ── Landing lights (both modes) ──
   if(ST.lights){
-    const lightColor=isSpace?'rgba(150,180,255,0.1)':'rgba(255,255,200,0.12)';
-    const beamBot=Math.max(horizon+10,H*0.6);
-    const grad=ctx.createRadialGradient(W/2,horizon,0,W/2,beamBot,H*0.3);
-    grad.addColorStop(0,lightColor);
-    grad.addColorStop(1,'rgba(0,0,0,0)');
-    ctx.fillStyle=grad;
+    const lAlpha=isSpace?0.08:0.1;
+    // Two angled beams from bottom center projecting forward
+    ctx.save();
+    // Left beam
+    const lGrad=ctx.createLinearGradient(W*0.4,H,W*0.3,H*0.3);
+    lGrad.addColorStop(0,`rgba(255,255,180,${lAlpha})`);
+    lGrad.addColorStop(1,'rgba(255,255,180,0)');
+    ctx.fillStyle=lGrad;
     ctx.beginPath();
-    ctx.moveTo(W/2-20,horizon);
-    ctx.lineTo(W*.15,beamBot);ctx.lineTo(W*.85,beamBot);
-    ctx.lineTo(W/2+20,horizon);
+    ctx.moveTo(W*0.44,H);
+    ctx.lineTo(W*0.1,H*0.15);
+    ctx.lineTo(W*0.38,H*0.15);
+    ctx.lineTo(W*0.48,H);
     ctx.fill();
+    // Right beam
+    const rGrad=ctx.createLinearGradient(W*0.6,H,W*0.7,H*0.3);
+    rGrad.addColorStop(0,`rgba(255,255,180,${lAlpha})`);
+    rGrad.addColorStop(1,'rgba(255,255,180,0)');
+    ctx.fillStyle=rGrad;
+    ctx.beginPath();
+    ctx.moveTo(W*0.52,H);
+    ctx.lineTo(W*0.62,H*0.15);
+    ctx.lineTo(W*0.9,H*0.15);
+    ctx.lineTo(W*0.56,H);
+    ctx.fill();
+    ctx.restore();
   }
 
   // ── Smoke trail ──
@@ -650,11 +665,15 @@ function onOri(e){
   if(b===null&&g===null)return;
   hasGyro=true;
   b=b||0; g=g||0;
-  // Compensate for screen orientation (landscape axis swap)
-  const orient=window.orientation||0;
-  if(orient===90){ const t=b; b=-g; g=t; }
-  else if(orient===-90){ const t=b; b=g; g=-t; }
-  else if(orient===180){ b=-b; g=-g; }
+  // In standalone/home-screen mode, iOS already rotates the axes for us.
+  // Only compensate if running in a browser tab.
+  const isStandalone=window.navigator.standalone||window.matchMedia('(display-mode:standalone)').matches;
+  if(!isStandalone){
+    const orient=(screen.orientation&&screen.orientation.angle)||window.orientation||0;
+    if(orient===90){ const t=b; b=-g; g=t; }
+    else if(orient===-90||orient===270){ const t=b; b=g; g=-t; }
+    else if(orient===180){ b=-b; g=-g; }
+  }
   gBeta=b;
   gGamma=g;
   // Auto-calibrate neutral position on first reading
