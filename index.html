@@ -293,9 +293,9 @@ const clouds=[];
 
 function mkCloud(layer){
   const cfg={
-    far: {xr:8000, zr:8000, yMin:200, yH:600, pMin:8, pMax:14, rMin:60, rMax:120, dxR:160, dyR:25, drift:[.15,.35]},
-    mid: {xr:5000, zr:5000, yMin:300, yH:800, pMin:8, pMax:14, rMin:80, rMax:150, dxR:160, dyR:32, drift:[.4,.7]},
-    near:{xr:3500, zr:3500, yMin:-300, yH:600, pMin:10, pMax:16, rMin:100, rMax:180, dxR:200, dyR:40, drift:[.8,1.5]},
+    far: {xr:8000, zr:8000, yMin:500, yH:800, pMin:8, pMax:14, rMin:60, rMax:120, dxR:160, dyR:25, drift:[.15,.35]},
+    mid: {xr:5000, zr:5000, yMin:600, yH:1000, pMin:8, pMax:14, rMin:80, rMax:150, dxR:160, dyR:32, drift:[.4,.7]},
+    near:{xr:3500, zr:3500, yMin:0, yH:800, pMin:10, pMax:16, rMin:100, rMax:180, dxR:200, dyR:40, drift:[.8,1.5]},
   }[layer];
   return{
     x:(Math.random()-.5)*cfg.xr, z:(Math.random()-.5)*cfg.zr,
@@ -313,7 +313,9 @@ for(let i=0;i<60;i++)clouds.push(mkCloud('near'));
 // ── Stars for space mode (pre-generated) ──
 const stars=[];
 for(let i=0;i<400;i++){
-  stars.push({x:Math.random(),y:Math.random(),r:.5+Math.random()*2.5,bri:.2+Math.random()*.8,spd:.3+Math.random()*3,phase:Math.random()*6.28});
+  const a=Math.random()*Math.PI*2;
+  const d=Math.random();
+  stars.push({a,d,r:.5+Math.random()*2.5,bri:.2+Math.random()*.8,spd:.3+Math.random()*3,phase:Math.random()*6.28});
 }
 
 // ── Moon craters ──
@@ -350,16 +352,24 @@ function drawScene(now){
   if(isSpace){
     // ── SPACE MODE ──
 
-    // Stars — shift with heading, twinkle, move with speed
+    // Stars — stream from center outward (flying forward effect)
+    const cx=W/2-ST.roll*200, cy=H/2+ST.pitch*150;
     for(let i=0;i<stars.length;i++){
       const s=stars[i];
-      const sx=((s.x*W-ST.hdg*500*s.bri+now*0.06*spdFactor*s.bri)%W+W)%W;
-      const sy=((s.y*H*0.95+ST.pitch*200*s.bri)%H+H)%H;
+      // d goes 0→1 from center to edge, animated by time+speed
+      const t=(s.d+now*0.00008*spdFactor*s.spd)%1;
+      const dist=t*t; // accelerate outward
+      const maxR=Math.max(W,H)*0.8;
+      const sx=cx+Math.cos(s.a+ST.hdg*0.5)*dist*maxR;
+      const sy=cy+Math.sin(s.a+ST.hdg*0.5)*dist*maxR;
+      if(sx<-20||sx>W+20||sy<-20||sy>H+20)continue;
       const twinkle=Math.sin(now*.001*s.spd+s.phase)*.4+.6;
-      ctx.globalAlpha=s.bri*twinkle;
+      const alpha=s.bri*twinkle*dist*2;
+      ctx.globalAlpha=Math.min(1,alpha);
       ctx.fillStyle='#fff';
       ctx.beginPath();
-      ctx.arc(sx,sy,s.r,0,Math.PI*2);
+      // Stars grow as they fly past
+      ctx.arc(sx,sy,s.r*(0.3+dist*1.5),0,Math.PI*2);
       ctx.fill();
     }
     ctx.globalAlpha=1;
