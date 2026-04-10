@@ -325,8 +325,8 @@ const smokeP=[];
 function drawScene(now){
   const isSpace=ST.space;
   const isNight=ST.night;
-  // Speed factor: 0.5 at idle, 2.0 at max throttle
-  const spdFactor=0.5+ST.thr*1.5;
+  // Speed factor: 0.3 at idle, 5.0 at max throttle
+  const spdFactor=0.3+ST.thr*4.7;
 
   // ── Sky gradient ──
   let skyTop,skyBot;
@@ -350,7 +350,7 @@ function drawScene(now){
     // Stars — shift with heading, twinkle, move with speed
     for(let i=0;i<stars.length;i++){
       const s=stars[i];
-      const sx=((s.x*W+ST.hdg*200*s.bri+now*0.005*spdFactor*s.bri)%W+W)%W;
+      const sx=((s.x*W+ST.hdg*200*s.bri+now*0.02*spdFactor*s.bri)%W+W)%W;
       const sy=((s.y*H*0.95+ST.pitch*50*s.bri)%H+H)%H;
       const twinkle=Math.sin(now*.001*s.spd+s.phase)*.4+.6;
       ctx.globalAlpha=s.bri*twinkle;
@@ -459,7 +459,7 @@ function drawScene(now){
 
     clouds.forEach(cl=>{
       // Drift with throttle speed
-      cl.x+=cl.drift*spdFactor*0.4;
+      cl.x+=cl.drift*spdFactor*1.2;
 
       // Wrap around player
       const wd=wrapDist[cl.layer];
