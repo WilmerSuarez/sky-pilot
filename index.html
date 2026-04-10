@@ -469,7 +469,7 @@ function drawScene(now){
     const wrapDist={far:4000,mid:2500,near:1750};
 
     clouds.forEach(cl=>{
-      cl.x+=cl.drift*spdFactor*1.2;
+      cl.z-=cl.drift*spdFactor*1.2;
 
       const wd=wrapDist[cl.layer];
       let dx=cl.x-ST.px, dz=cl.z-ST.pz;
