@@ -175,7 +175,6 @@ canvas#sky{position:fixed;top:0;left:0;width:100%;height:55%;z-index:1}
     <!-- CENTER: Yoke + Tilt button + Mini gauges -->
     <div class="center-col">
       <canvas id="yoke" width="360" height="200"></canvas>
-      <button id="bTilt" style="background:linear-gradient(180deg,#3a5a27,#1a3a10);border:2px solid #6a4;border-radius:8px;color:#8f8;font-family:inherit;font-size:9px;font-weight:bold;padding:4px 14px;cursor:pointer;-webkit-tap-highlight-color:transparent;text-shadow:0 0 6px rgba(0,255,0,.4)">📐 ENABLE TILT</button>
       <div class="mini-gauges">
         <div class="mini-gauge"><div class="g-needle" id="nFuel"></div><div class="g-dot"></div><div class="g-val" id="vFuel">78</div><div class="g-label">FUEL %</div></div>
         <div class="mini-gauge"><div class="g-needle" id="nTemp"></div><div class="g-dot"></div><div class="g-val" id="vTemp">420</div><div class="g-label">ENG TEMP</div></div>
@@ -291,9 +290,9 @@ const clouds=[];
 
 function mkCloud(layer){
   const cfg={
-    far: {xr:8000, zr:8000, yMin:200, yH:600, pMin:8, pMax:14, rMin:50, rMax:90, dxR:140, dyR:20, drift:[.15,.35]},
-    mid: {xr:5000, zr:5000, yMin:300, yH:800, pMin:8, pMax:12, rMin:60, rMax:110, dxR:130, dyR:28, drift:[.4,.7]},
-    near:{xr:3500, zr:3500, yMin:-300, yH:600, pMin:10, pMax:16, rMin:70, rMax:130, dxR:160, dyR:35, drift:[.8,1.5]},
+    far: {xr:8000, zr:8000, yMin:200, yH:600, pMin:8, pMax:14, rMin:60, rMax:120, dxR:160, dyR:25, drift:[.15,.35]},
+    mid: {xr:5000, zr:5000, yMin:300, yH:800, pMin:8, pMax:14, rMin:80, rMax:150, dxR:160, dyR:32, drift:[.4,.7]},
+    near:{xr:3500, zr:3500, yMin:-300, yH:600, pMin:10, pMax:16, rMin:100, rMax:180, dxR:200, dyR:40, drift:[.8,1.5]},
   }[layer];
   return{
     x:(Math.random()-.5)*cfg.xr, z:(Math.random()-.5)*cfg.zr,
@@ -327,7 +326,7 @@ function drawScene(now){
   const isSpace=ST.space;
   const isNight=ST.night;
   // Speed factor: 0.3 at idle, 5.0 at max throttle
-  const spdFactor=0.3+ST.thr*4.7;
+  const spdFactor=0.3+ST.thr*11.7;
 
   // ── Sky gradient ──
   let skyTop,skyBot;
@@ -618,36 +617,17 @@ function listenGyro(){
   window.addEventListener('deviceorientationabsolute',onOri);
 }
 
-// Called from user gesture (tap on ENABLE TILT button)
+// Request gyro permission (called from user gesture on iOS)
 function requestGyro(){
-  // Try requestPermission (required on all iOS browsers since they all use WebKit)
   if(typeof DeviceOrientationEvent!=='undefined' && typeof DeviceOrientationEvent.requestPermission==='function'){
     DeviceOrientationEvent.requestPermission().then(p=>{
       if(p==='granted'){listenGyro()}
-      updTiltBtn();
-    }).catch(()=>{listenGyro();updTiltBtn()});
+    }).catch(()=>{listenGyro()});
   }else{
-    // Android / desktop — just listen
     listenGyro();
   }
-  // Also try DeviceMotion permission (some iOS versions need this too)
   if(typeof DeviceMotionEvent!=='undefined' && typeof DeviceMotionEvent.requestPermission==='function'){
     DeviceMotionEvent.requestPermission().catch(()=>{});
-  }
-  setTimeout(updTiltBtn,1500);
-}
-
-function updTiltBtn(){
-  const btn=document.getElementById('bTilt');
-  if(!btn)return;
-  if(hasGyro){
-    btn.textContent='✅ TILT ON';
-    btn.style.borderColor='#0f0';
-    btn.style.color='#0f0';
-  }else{
-    btn.textContent='❌ NO TILT (use touch)';
-    btn.style.borderColor='#f44';
-    btn.style.color='#f88';
   }
 }
 
@@ -691,7 +671,7 @@ function setupTouch(){
 
 function updControls(dt){
   if(hasGyro){
-    ST.tRoll=Math.max(-1,Math.min(1,-gGamma*.02));
+    ST.tRoll=Math.max(-1,Math.min(1,gGamma*.02));
     ST.tPitch=Math.max(-1,Math.min(1,-(gBeta-40)*.012));
   }else if(dragActive){
     const dx=dragCurX-dragStartX;
@@ -706,8 +686,8 @@ function updControls(dt){
   ST.pitch=Math.max(-.8,Math.min(.8,ST.pitch));
   if(ST.ap){ST.tRoll*=.3;ST.tPitch*=.3}
   ST.hdg+=ST.roll*.8*dt;
-  ST.spd=100+ST.thr*400;
-  const mv=ST.spd*.5*dt;
+  ST.spd=100+ST.thr*600;
+  const mv=ST.spd*.8*dt;
   ST.px+=Math.sin(ST.hdg)*mv;
   ST.pz-=Math.cos(ST.hdg)*mv;
   ST.alt+=ST.pitch*200*dt;
@@ -802,9 +782,6 @@ function setupButtons(){
   tap('bBelt',()=>{ST.belt=!ST.belt;document.getElementById('lBelt').classList.toggle('on',ST.belt);sndDing()});
   tap('bSmk',()=>{ST.smoke=!ST.smoke;document.getElementById('lSmk').classList.toggle('on',ST.smoke);sndClick()});
   tap('bHorn',()=>{sndHorn()});
-
-  // Tilt enable button (needs user gesture on iOS)
-  tap('bTilt',()=>{requestGyro();sndClick()});
 
   tap('bFire',()=>{ST.fire=!ST.fire;document.getElementById('lFire').classList.toggle('on',ST.fire);sndBeep()});
   tap('bHeat',()=>{ST.heat=!ST.heat;document.getElementById('lHeat').classList.toggle('on',ST.heat);sndClick()});
